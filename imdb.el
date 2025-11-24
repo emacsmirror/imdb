@@ -31,7 +31,7 @@
 (require 'json)
 (require 'url-cache)
 
-(defvar imdb-query-url "https://www.imdb.com/find/?q=%s&s=tt&ref_=fn_al_tt_mr")
+(defvar imdb-query-url "https://www.imdb.com/find/?q=%s&ref_=hm_nv_srb_sm")
 
 (defun imdb-url-retrieve-synchronously (url)
   (let ((cache (url-cache-create-filename url)))
