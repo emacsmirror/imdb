@@ -551,6 +551,32 @@ This will take some hours and use 10GB of disk space."
 	(erase-buffer)
 	(imdb-mode-search-film-1 film)))))
 
+(defun imdb-matching-films (name)
+  "Return data on all films that have NAME."
+  (imdb-initialize)
+  (seq-take
+   (sort
+    (cl-loop for movie in (sqorm-select 'movie :primary-title name)
+	     for mid = (plist-get movie :mid)
+	     collect (list :title (plist-get movie :primary-title)
+			   :ratings (or (plist-get
+					 (car (sqorm-select 'rating :mid mid))
+					 :votes)
+					0)
+			   :id mid
+			   :director
+			   (string-join
+			    (mapcar
+			     (lambda (e)
+			       (plist-get e :primary-name))
+			     (sqorm-select-where "select primary_name from person inner join crew on crew.pid = person.pid where crew.category = 'director' and crew.mid = ?"
+						 mid))
+			    ", ")
+			   :year (plist-get movie :start-year)))
+    (lambda (m1 m2)
+      (> (plist-get m1 :ratings) (plist-get m2 :ratings))))
+   10))
+
 (defun imdb-mode-search-film-1 (film)
   (let ((films (if sqorm-regexp
 		   (sqorm-select-where
