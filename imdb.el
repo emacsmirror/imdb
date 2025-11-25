@@ -64,7 +64,7 @@
 	(libxml-parse-html-region (point) (point-max))
       (kill-buffer (current-buffer)))))
 
-(defun imdb-get-image-and-country (id &optional image-only just-image)
+(defun imdb-get-image-and-country (id &optional image-only)
   (with-current-buffer (imdb-fetch-url
 			(format "https://www.imdb.com/title/%s/" id))
     (let ((country (save-excursion
@@ -81,50 +81,26 @@
 	   return
 	   (if image-only
 	       (imdb-get-image src)
-	     (if just-image
-		 (imdb-get-image-data src)
-	       (list (imdb-get-image-string src)
-		     country
-		     ;; Director.
-		     (string-join
-		      (cl-loop for link in (dom-by-tag dom 'li)
-			       for span = (dom-by-tag link 'span)
-			       when (and span
-					 (or (equal (dom-text span)
-						    "Director")
-					     (equal (dom-text span)
-						    "Directors")))
-			       return
-			       (cl-loop for dir in (dom-by-tag link 'a)
-					collect (dom-text dir)))
-		      " + ")))))
+	     (list (imdb-get-image-string src)
+		   country
+		   ;; Director.
+		   (string-join
+		    (cl-loop for link in (dom-by-tag dom 'li)
+			     for span = (dom-by-tag link 'span)
+			     when (and span
+				       (or (equal (dom-text span)
+						  "Director")
+					   (equal (dom-text span)
+						  "Directors")))
+			     return
+			     (cl-loop for dir in (dom-by-tag link 'a)
+				      collect (dom-text dir)))
+		    " + "))))
 	(kill-buffer (current-buffer))))))
 
 (defun imdb-get-image-string (url)
-  (with-current-buffer (imdb-url-retrieve-synchronously url)
-    (url-store-in-cache)
-    (goto-char (point-min))
-    (prog1
-	(when (search-forward "\n\n" nil t)
-	  (let ((image
-		 (ignore-errors
-		   (create-image
-		    (buffer-substring (point) (point-max)) nil t
-		    :max-height 200))))
-	    (when image
-	      (propertize
-	       " "
-	       'display image))))
-      (kill-buffer (current-buffer)))))
-
-(defun imdb-get-image-data (url)
-  (with-current-buffer (imdb-url-retrieve-synchronously url)
-    (url-store-in-cache)
-    (goto-char (point-min))
-    (prog1
-	(when (search-forward "\n\n" nil t)
-	  (buffer-substring (point) (point-max)))
-      (kill-buffer (current-buffer)))))
+  (propertize
+   " " 'display (create-image (imdb-get-image url) nil t :max-height 200)))
 
 (defun imdb-get-image (url)
   (with-current-buffer (imdb-url-retrieve-synchronously url)
@@ -134,32 +110,6 @@
 	(when (search-forward "\n\n" nil t)
 	  (buffer-substring (point) (point-max)))
       (kill-buffer (current-buffer)))))
-
-(defun imdb-get-image-from-json (json)
-  (if (listp json)
-      (let* ((images
-	      (cdr (assq 'allImages
-			 (cadr (assq 'galleries (assq 'mediaviewer json))))))
-	     (aax
-	      (cdr
-	       (assq 'aaxUrl
-		     (cdr
-		      (assq 'interstitialModel
-			    (cadr (assq 'galleries
-					(assq 'mediaviewer json))))))))
-	     ;; The default (and most "important") poster is named in a
-	     ;; string in the "aax" element.  *sigh*
-	     (initial (and aax
-			   (string-match "mediaviewer%2F\\([^%]+\\)" aax)
-			   (match-string 1 aax))))
-	(cl-loop for image across images
-		 when (equal (cdr (assq 'id image)) initial)
-		 return (cdr (assq 'src image))))
-    ;; This used to be much more complicated, but now it's just the
-    ;; first image in the list.  But retain the loop just because
-    ;; that'll change.
-    (cl-loop for image across json
-	     return (cdr (assq 'url (cdr (assq 'node image)))))))
 
 (defun imdb-query-full (title)
   (cl-loop for result in (imdb-extract-data
