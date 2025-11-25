@@ -208,7 +208,7 @@
 	 (data (append
 		(imdb-extract-data (imdb-get-data title) max-results)
 		(and (file-exists-p "~/.emacs.d/imdb/imdb.sqlite3")
-		     (cl-loop for film in (imdb-matching-films "Desire")
+		     (cl-loop for film in (imdb-matching-films title)
 			      collect (format " %s, %s, %s, %s"
 					      (plist-get film :title)
 					      (plist-get film :year)
