@@ -1272,17 +1272,21 @@ This will take some hours and use 10GB of disk space."
      (let* ((dom (libxml-parse-html-region (point) (point-max)))
 	    (films
 	     (cl-loop
-	      for elem in (dom-by-class dom "\\`ipc-metadata-list-summary-item ")
+	      for elem in (dom-by-class
+			   dom "\\`ipc-metadata-list-summary-item ")
 	      for link = (dom-by-tag elem 'a)
 	      for href = (dom-attr link 'href)
-	      for character = (dom-texts (dom-by-class elem "credit-text-list"))
+	      for character = (dom-texts
+			       (dom-by-class elem "credit-text-list"))
 	      for year = (dom-text
-			  (dom-by-class elem "ipc-metadata-list-summary-item__cc"))
+			  (dom-by-class
+			   elem "ipc-metadata-list-summary-item__cc"))
 	      for stars = (car (dom-by-class elem "ipc-rating-star-group"))
 	      for category = (and stars
 				  (dom-text
 				   (last (dom-children
-					  (dom-parent elem (dom-parent elem stars))))))
+					  (dom-parent
+					   elem (dom-parent elem stars))))))
 	      when (and href year 
 			(string-match "/title/\\([^/]+\\)" href))
 	      collect
@@ -1296,7 +1300,11 @@ This will take some hours and use 10GB of disk space."
 		  (list :mid (match-string 1 href)
 			:primary-title (imdb-clean (dom-texts link))
 			:type "movie"
-			:start-year (split-string (imdb-clean year) "/")
+			:start-year
+			(let ((year (split-string (imdb-clean year) "/")))
+			  (if (equal year "")
+			      0
+			    (string-to-number year)))
 			:category category
 			:character (imdb-clean character)))))))
        (setq films (cl-sort (nreverse films) '<
