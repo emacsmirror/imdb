@@ -1118,24 +1118,25 @@ This will take some hours and use 10GB of disk space."
    (format "https://www.imdb.com/title/%s/fullcredits?ref_=tt_cl_sm" mid)
    (lambda (_status)
      (url-store-in-cache)
-     (let* ((table (dom-by-class
-		    (libxml-parse-html-region (point) (point-max))
-		    "cast_list"))
+     (let* ((dom (libxml-parse-html-region (point) (point-max)))
 	    (people
-	     (cl-loop for line in (dom-by-tag table 'tr)
-		      for link = (dom-by-tag line 'a)
+	     (cl-loop for line in (dom-by-tag dom 'li)
+		      for img = (dom-attr (dom-by-tag line 'img) 'src)
+		      for link = (cl-loop for elem in (dom-by-tag line 'a)
+					  when (string-match
+						"ipc-link"
+						(dom-attr elem 'class))
+					  return elem)
 		      for person = (dom-attr link 'href)
 		      when (and person
 				(string-match "name/\\([^/]+\\)" person))
 		      collect (list :pid (match-string 1 person)
-				    :name (imdb-clean
-					   (dom-texts
-					    (cadr (dom-non-text-children
-						   line))))
-				    :character (imdb-clean
-						(dom-texts
-						 (dom-by-class
-						  line "character"))))))
+				    :name (imdb-clean (dom-texts link))
+				    ;; FIXME: Use this
+				    :img img
+				    :character (dom-texts
+						(last
+						 (dom-by-tag line 'a))))))
 	    updates)
        (with-current-buffer buffer
 	 (save-excursion
