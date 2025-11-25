@@ -1266,48 +1266,42 @@ This will take some hours and use 10GB of disk space."
 		   (imdb-mode-person-film film pid)))))))))))
 
 (defun imdb-person-get-films (pid callback)
-  (imdb-url-retrieve
+  (imdb-url-retrieve-html
    (imdb-mode-person-url pid)
    (lambda (_)
-     (goto-char (point-min))
-     (let (films)
-       (when (search-forward "\n\n" nil t)
-	 (url-store-in-cache)
-	 (setq films
-	       (cl-loop for elem in (dom-by-class
-				     (libxml-parse-html-region
-				      (point) (point-max))
-				     "\\`filmo-row")
-			for link = (dom-by-tag elem 'a)
-			for href = (dom-attr link 'href)
-			for character = (car (last (dom-children elem)))
-			for year = (dom-by-class elem "\\`year")
-			when (and href year 
-				  (string-match "/title/\\([^/]+\\)" href))
-			collect
-			;; If we have the data on the film, use it.
-			(let ((film (car (sqorm-select
-					  'movie :mid (match-string 1 href)))))
-			  (if film
-			      (progn
-				(setf (cl-getf film :category)
-				      (car (split-string (dom-attr elem 'id)
-							 "-")))
-				film)
-			    (list :mid (match-string 1 href)
-				  :primary-title (imdb-clean (dom-texts link))
-				  :type "movie"
-				  :start-year
-				  (string-to-number
-				   (car (split-string
-					 (imdb-clean (dom-texts year)) "/")))
-				  :category
-				  (car (split-string (dom-attr elem 'id) "-"))
-				  :character (and (stringp character)
-						  (imdb-clean character)))))))
-	 (setq films (cl-sort (nreverse films) '<
-			      :key (lambda (elem)
-				     (or (cl-getf elem :year) 1.0e+INF)))))
+     (let* ((dom (libxml-parse-html-region (point) (point-max)))
+	    (films
+	     (cl-loop
+	      for elem in (dom-by-class dom "\\`ipc-metadata-list-summary-item ")
+	      for link = (dom-by-tag elem 'a)
+	      for href = (dom-attr link 'href)
+	      for character = (dom-texts (dom-by-class elem "credit-text-list"))
+	      for year = (dom-text
+			  (dom-by-class elem "ipc-metadata-list-summary-item__cc"))
+	      for stars = (car (dom-by-class elem "ipc-rating-star-group"))
+	      for category = (and stars
+				  (dom-text
+				   (last (dom-children
+					  (dom-parent elem (dom-parent elem stars))))))
+	      when (and href year 
+			(string-match "/title/\\([^/]+\\)" href))
+	      collect
+	      ;; If we have the data on the film, use it.
+	      (let ((film (car (sqorm-select
+				'movie :mid (match-string 1 href)))))
+		(if film
+		    (progn
+		      (setf (cl-getf film :category) category)
+		      film)
+		  (list :mid (match-string 1 href)
+			:primary-title (imdb-clean (dom-texts link))
+			:type "movie"
+			:start-year (split-string (imdb-clean year) "/")
+			:category category
+			:character (imdb-clean character)))))))
+       (setq films (cl-sort (nreverse films) '<
+			    :key (lambda (elem)
+				   (or (cl-getf elem :year) 1.0e+INF))))
        (funcall callback films)
        (kill-buffer (current-buffer))))))
 
