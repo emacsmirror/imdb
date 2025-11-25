@@ -249,7 +249,7 @@
 	    (more (imdb-get-image-and-country (match-string 3 result))))
 	(append res
 		(list :country (nth 1 more)
-		      :directory (nth 2 more)
+		      :director (nth 2 more)
 		      :image (nth 0 more)))))))
 
 (provide 'imdb)
