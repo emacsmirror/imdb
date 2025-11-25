@@ -127,7 +127,7 @@
       (kill-buffer (current-buffer)))))
 
 (defun imdb-get-image (url)
-  (with-current-buffer (imdb-url-retrieve-synchronously src)
+  (with-current-buffer (imdb-url-retrieve-synchronously url)
     (url-store-in-cache)
     (goto-char (point-min))
     (prog1
@@ -205,7 +205,15 @@
   "Query IMDB for TITLE, and then prompt the user for the right match."
   (interactive "sTitle: ")
   (let* ((max-mini-window-height 0.5)
-	 (data (imdb-extract-data (imdb-get-data title) max-results))
+	 (data (append
+		(imdb-extract-data (imdb-get-data title) max-results)
+		(and (file-exists-p "~/.emacs.d/imdb/imdb.sqlite3")
+		     (cl-loop for film in (imdb-matching-films "Desire")
+			      collect (format " %s, %s, %s, %s"
+					      (plist-get film :title)
+					      (plist-get film :year)
+					      (plist-get film :id)
+					      (plist-get film :director))))))
 	 (result (if (and max-results (= max-results 1))
 		     (car data)
 		   (if data
