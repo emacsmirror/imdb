@@ -197,7 +197,7 @@
 				  (create-image
 				   (buffer-substring (point) (point-max))
 				   nil t)))))
-		    title
+		    (string-replace "," "" title)
 		    year
 		    id)))
 
@@ -210,10 +210,14 @@
 		(and (file-exists-p "~/.emacs.d/imdb/imdb.sqlite3")
 		     (cl-loop for film in (imdb-matching-films title)
 			      collect (format " %s, %s, %s, %s"
-					      (plist-get film :title)
+					      (string-replace
+					       "," ""
+					       (plist-get film :title))
 					      (plist-get film :year)
 					      (plist-get film :id)
-					      (plist-get film :director))))))
+					      (string-replace
+					       ", " " + "
+					      (plist-get film :director)))))))
 	 (result (if (and max-results (= max-results 1))
 		     (car data)
 		   (if data
