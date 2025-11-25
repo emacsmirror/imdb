@@ -1172,44 +1172,37 @@ This will take some hours and use 10GB of disk space."
 	    (mapcar (lambda (e) (cl-getf e :pid)) (nreverse updates))
 	    buffer 100 150 3)))))))
 
+(defun imdb-largest-image (img)
+  (let ((srcset (dom-attr img 'srcset)))
+    (if srcset
+	(caar (shr--parse-srcset srcset))
+      (dom-attr img 'src))))
+
 (defun imdb-fetch-profile-picture (pid callback)
-  (imdb-url-retrieve
+  (imdb-url-retrieve-html
    (imdb-mode-person-url pid)
-   (lambda (status)
-     (goto-char (point-min))
-     (if (or (not (search-forward "\n\n" nil t))
-	     (cl-getf status :error))
-	 (progn
-	   (kill-buffer (current-buffer))
-	   (funcall callback nil))
-       (url-store-in-cache)
-       (let* ((dom (libxml-parse-html-region (point) (point-max)))
-	      (img (cl-loop for elem in (dom-by-tag dom 'script)
-			    for image =
-			    (and (equal (dom-attr elem 'type)
-					"application/ld+json")
-				 (let ((json (json-parse-string
-					      (car (dom-children elem)))))
-				   (and json
-					(gethash "image" json))))
-			    when image
-			    return image)))
-	 (kill-buffer (current-buffer))
-	 (if img
-	     (imdb-url-retrieve
-	      img 
-	      (lambda (status)
-		(goto-char (point-min))
-		(if (and (search-forward "\n\n" nil t)
-			 (not (cl-getf status :error)))
-		    (progn
-		      (url-store-in-cache)
-		      (let ((data (buffer-substring (point) (point-max))))
-			(kill-buffer (current-buffer))
-			(funcall callback data)))
-		  (kill-buffer (current-buffer))
-		  (funcall callback nil))))
-	   (funcall callback nil)))))))
+   (lambda (_status)
+     (url-store-in-cache)
+     (let* ((dom (libxml-parse-html-region (point) (point-max)))
+	    (img (cl-loop for image in (dom-by-tag dom 'img)
+			  when (equal (dom-attr image 'class) "ipc-image")
+			  return (imdb-largest-image image))))
+       (kill-buffer (current-buffer))
+       (if img
+	   (imdb-url-retrieve
+	    img 
+	    (lambda (status)
+	      (goto-char (point-min))
+	      (if (and (search-forward "\n\n" nil t)
+		       (not (cl-getf status :error)))
+		  (progn
+		    (url-store-in-cache)
+		    (let ((data (buffer-substring (point) (point-max))))
+		      (kill-buffer (current-buffer))
+		      (funcall callback data)))
+		(kill-buffer (current-buffer))
+		(funcall callback nil))))
+	 (funcall callback nil))))))
 
 (defun imdb-load-people-images (pids buffer width height newlines)
   (let ((pid (pop pids)))
@@ -1339,6 +1332,30 @@ This will take some hours and use 10GB of disk space."
     (_ (replace-regexp-in-string "_" " " type))))
 
 (defvar imdb-buffers nil)
+
+(defun imdb-url-retrieve-html (url callback)
+  (let ((default-directory (file-name-directory (locate-library "imdb"))))
+    (with-current-buffer (generate-new-buffer " *imdb url cache*")
+      (setq-local url-current-object (url-generic-parse-url url))
+      (let ((cache (url-cache-create-filename url)))
+	(if (file-exists-p cache)
+	    (progn
+	      (insert-file-contents cache)
+	      (funcall callback nil))
+	  (make-process
+	   :name "get-html"
+	   :buffer (current-buffer)
+	   :command (list (expand-file-name "get-html.py") url)
+	   :sentinel
+	   (lambda (proc _status)
+	     (unless (process-live-p proc)
+	       (with-current-buffer (process-buffer proc)
+		 (let ((coding-system-for-write 'binary))
+		   (unless (file-exists-p (file-name-directory cache))
+		     (make-directory (file-name-directory cache) t))
+		   (write-region (point-min) (point-max) cache nil 'silent)
+		   (goto-char (point-min))
+		   (funcall callback nil)))))))))))
 
 (defun imdb-url-retrieve (url callback)
   (let ((cache (url-cache-create-filename url)))
