@@ -1050,21 +1050,18 @@ This will take some hours and use 10GB of disk space."
 
 (defun imdb-update-film-image (id)
   (let ((buffer (current-buffer)))
-    (imdb-url-retrieve
+    (imdb-url-retrieve-html
      (imdb-mode-film-url id)
      (lambda (status)
-       (goto-char (point-min))
-       (if (or (not (search-forward "\n\n" nil t))
-	       (cl-getf status :error))
+       (if (cl-getf status :error)
 	   (imdb-placehold-film buffer)
 	 (url-store-in-cache)
 	 (imdb-update-film-image-1
 	  (cl-loop with dom = (libxml-parse-html-region (point) (point-max))
-		   for image in (dom-by-tag dom 'meta)
-		   for src = (dom-attr image 'content)
+		   for image in (dom-by-tag dom 'img)
+		   for src = (dom-attr image 'src)
 		   when (and src
-			     (equal (dom-attr image 'property)
-				    "og:image"))
+			     (equal (dom-attr image 'class) "ipc-image"))
 		   return src)
 	  buffer))
        (kill-buffer (current-buffer))))))
@@ -1117,60 +1114,57 @@ This will take some hours and use 10GB of disk space."
   (string-trim (replace-regexp-in-string "[  \t\n]+" " " string)))
 
 (defun imdb-get-actors (mid buffer)
-  (imdb-url-retrieve
+  (imdb-url-retrieve-html
    (format "https://www.imdb.com/title/%s/fullcredits?ref_=tt_cl_sm" mid)
-   (lambda (status)
-     (goto-char (point-min))
-     (when (and (search-forward "\n\n" nil t)
-		(not (cl-getf status :error)))
-       (url-store-in-cache)
-       (let* ((table (dom-by-class
-		      (libxml-parse-html-region (point) (point-max))
-		      "cast_list"))
-	      (people
-	       (cl-loop for line in (dom-by-tag table 'tr)
-			for link = (dom-by-tag line 'a)
-			for person = (dom-attr link 'href)
-			when (and person
-				  (string-match "name/\\([^/]+\\)" person))
-			collect (list :pid (match-string 1 person)
-				      :name (imdb-clean
-					     (dom-texts
-					      (cadr (dom-non-text-children
-						     line))))
-				      :character (imdb-clean
-						  (dom-texts
-						   (dom-by-class
-						    line "character"))))))
-	      updates)
-	 (with-current-buffer buffer
-	   (save-excursion
-	     (goto-char (point-max))
-	     (let ((inhibit-read-only t))
-	       (insert "\n")
-	       (dolist (person people)
-		 (let ((start (point)))
-		   (if (> (length updates) 10)
-		       (let ((start (point)))
-			 (imdb-insert-placeholder 100 150 "#004000")
-			 (put-text-property start (point) 'placeholder t))
-		     (push person updates)
-		     (imdb-insert-placeholder 100 150))
-		   (insert
-		    (format " %s%s\n"
-			    (imdb-face (cl-getf person :name))
-			    (if (equal (cl-getf person :character) "")
-				""
-			      (imdb-face (format " \"%s\""
-						 (cl-getf person :character))
-					 "#a0a0a0"))))
-		   (put-text-property start (point)
-				      'id (cl-getf person :pid)))))))
-	 (kill-buffer (current-buffer))
-	 (when people
-	   (imdb-load-people-images
-	    (mapcar (lambda (e) (cl-getf e :pid)) (nreverse updates))
-	    buffer 100 150 3)))))))
+   (lambda (_status)
+     (url-store-in-cache)
+     (let* ((table (dom-by-class
+		    (libxml-parse-html-region (point) (point-max))
+		    "cast_list"))
+	    (people
+	     (cl-loop for line in (dom-by-tag table 'tr)
+		      for link = (dom-by-tag line 'a)
+		      for person = (dom-attr link 'href)
+		      when (and person
+				(string-match "name/\\([^/]+\\)" person))
+		      collect (list :pid (match-string 1 person)
+				    :name (imdb-clean
+					   (dom-texts
+					    (cadr (dom-non-text-children
+						   line))))
+				    :character (imdb-clean
+						(dom-texts
+						 (dom-by-class
+						  line "character"))))))
+	    updates)
+       (with-current-buffer buffer
+	 (save-excursion
+	   (goto-char (point-max))
+	   (let ((inhibit-read-only t))
+	     (insert "\n")
+	     (dolist (person people)
+	       (let ((start (point)))
+		 (if (> (length updates) 10)
+		     (let ((start (point)))
+		       (imdb-insert-placeholder 100 150 "#004000")
+		       (put-text-property start (point) 'placeholder t))
+		   (push person updates)
+		   (imdb-insert-placeholder 100 150))
+		 (insert
+		  (format " %s%s\n"
+			  (imdb-face (cl-getf person :name))
+			  (if (equal (cl-getf person :character) "")
+			      ""
+			    (imdb-face (format " \"%s\""
+					       (cl-getf person :character))
+				       "#a0a0a0"))))
+		 (put-text-property start (point)
+				    'id (cl-getf person :pid)))))))
+       (kill-buffer (current-buffer))
+       (when people
+	 (imdb-load-people-images
+	  (mapcar (lambda (e) (cl-getf e :pid)) (nreverse updates))
+	  buffer 100 150 3))))))
 
 (defun imdb-largest-image (img)
   (let ((srcset (dom-attr img 'srcset)))
