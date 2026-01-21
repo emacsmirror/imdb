@@ -64,6 +64,19 @@
 	(libxml-parse-html-region (point) (point-max))
       (kill-buffer (current-buffer)))))
 
+(defun imdb--get-poster (dom)
+  ;; The primary poster image is in a JSON structure in a script.
+  (let ((json (with-temp-buffer
+		(insert (dom-text (dom-by-id dom "__NEXT_DATA__")))
+		(goto-char (point-min))
+		(json-parse-buffer :object-type 'plist))))
+    (plist-get
+     (plist-get
+      (plist-get (plist-get (plist-get json :props) :pageProps)
+		 :aboveTheFoldData)
+      :primaryImage)
+     :url)))
+
 (defun imdb-get-image-and-country (id &optional image-only)
   (with-current-buffer (imdb-fetch-url
 			(format "https://www.imdb.com/title/%s/" id))
@@ -74,10 +87,8 @@
       (prog1
 	  (cl-loop
 	   with dom = (libxml-parse-html-region (point-min) (point-max))
-	   for image in (dom-by-tag dom 'img)
-	   for src = (dom-attr image 'src)
-	   when (and src
-		     (equal (dom-attr image 'class) "ipc-image"))
+	   for src = (imdb--get-poster dom)
+	   when src
 	   return
 	   (if image-only
 	       (imdb-get-image src)
