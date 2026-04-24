@@ -14,8 +14,15 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service as ChromeService
 
+dowait = False
+# If needed, open Chrome non-headless and give the user 30 seconds
+# to click on any cookie banners and the like.
+if len(sys.argv) > 2 and sys.argv[2] == "cookies":
+    dowait = True
+
 selenium_cookie_file = 'imdb.pickle'
 service = ChromeService(executable_path="/usr/bin/chromedriver")
+
 
 # Open Crome
 chrome_options = webdriver.ChromeOptions()
@@ -24,7 +31,8 @@ chrome_options.add_experimental_option("prefs", prefs)
 chrome_options.add_argument("--disable-notifications")
 # The default User-Agent is "HeadlessChrome", which imdb.com bans.
 chrome_options.add_argument(f'--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36')
-chrome_options.add_argument("--headless")
+if not dowait:
+    chrome_options.add_argument("--headless")
 chrome_options.add_argument("--disable-dev-shm-usage");
 chrome_options.add_experimental_option('prefs', {'intl.accept_languages': 'no'})
 
@@ -57,6 +65,10 @@ def load_cookies():
 
 load_cookies()
 driver.get(sys.argv[1])
+
+if dowait:
+    time.sleep(30)
+
 save_cookies()
 
 print(driver.execute_script("return document.body.innerHTML;"))
