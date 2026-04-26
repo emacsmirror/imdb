@@ -1327,7 +1327,7 @@ This will take some hours and use 10GB of disk space."
 			:primary-title (imdb-clean (dom-texts link))
 			:type "movie"
 			:start-year
-			(let ((year (split-string (imdb-clean year) "/")))
+			(let ((year (car (split-string (imdb-clean year) "/"))))
 			  (if (equal year "")
 			      0
 			    (string-to-number year)))
@@ -1352,7 +1352,7 @@ This will take some hours and use 10GB of disk space."
     ("camera_department" "camera dept")
     ("sound_department" "sound")
     ("actress" "actor")
-    (_ (replace-regexp-in-string "_" " " type))))
+    (_ (replace-regexp-in-string "_" " " (or type "")))))
 
 (defvar imdb-buffers nil)
 
