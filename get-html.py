@@ -20,7 +20,7 @@ dowait = False
 if len(sys.argv) > 2 and sys.argv[2] == "cookies":
     dowait = True
 
-selenium_cookie_file = 'imdb.pickle'
+selenium_cookie_file = '/home/larsi/src/imdb.el/imdb.pickle'
 service = ChromeService(executable_path="/usr/bin/chromedriver")
 
 
@@ -32,7 +32,7 @@ chrome_options.add_argument("--disable-notifications")
 # The default User-Agent is "HeadlessChrome", which imdb.com bans.
 chrome_options.add_argument(f'--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36')
 if not dowait:
-    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--headless=new")
 chrome_options.add_argument("--disable-dev-shm-usage");
 chrome_options.add_experimental_option('prefs', {'intl.accept_languages': 'no'})
 
@@ -63,6 +63,7 @@ def load_cookies():
         # Disable network tracking
         driver.execute_cdp_cmd('Network.disable', {})
 
+driver.get("https://www.imdb.com/")
 load_cookies()
 driver.get(sys.argv[1])
 
