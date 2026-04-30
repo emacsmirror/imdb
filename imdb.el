@@ -66,18 +66,20 @@
 
 (defun imdb--get-poster (dom)
   ;; The primary poster image is in a JSON structure in a script.
-  (let ((json (with-temp-buffer
-		(insert (dom-text (dom-by-id dom "__NEXT_DATA__")))
-		(goto-char (point-min))
-		(json-parse-buffer :object-type 'plist))))
-    (plist-get
-     (plist-get
-      (plist-get (plist-get (plist-get json :props) :pageProps)
-		 :aboveTheFoldData)
-      :primaryImage)
-     :url)))
+  (let ((elem (dom-text (dom-by-id dom "__NEXT_DATA__"))))
+    (when (> (length elem) 0)
+      (let ((json (with-temp-buffer
+		    (insert elem)
+		    (goto-char (point-min))
+		    (json-parse-buffer :object-type 'plist))))
+	(plist-get
+	 (plist-get
+	  (plist-get (plist-get (plist-get json :props) :pageProps)
+		     :aboveTheFoldData)
+	  :primaryImage)
+	 :url)))))
 
-(defun imdb-get-image-and-country (id &optional image-only)
+(defun imdb-get-image-and-country (id &optional image-only no-string)
   (with-current-buffer (imdb-fetch-url
 			(format "https://www.imdb.com/title/%s/" id))
     (let ((country (save-excursion
@@ -85,29 +87,32 @@
 			    "country_of_origin=\\([a-zA-Z]+\\)" nil t)
 		       (match-string 1)))))
       (prog1
-	  (cl-loop
-	   with dom = (libxml-parse-html-region (point-min) (point-max))
-	   for src = (imdb--get-poster dom)
-	   when src
-	   return
-	   (if image-only
-	       (imdb-get-image src)
-	     (list (imdb-get-image-string src)
-		   country
-		   ;; Director.
-		   (string-join
-		    (cl-loop for link in (dom-by-tag dom 'li)
-			     for span = (dom-by-tag link 'span)
-			     when (and span
-				       (or (equal (dom-text span)
-						  "Director")
-					   (equal (dom-text span)
-						  "Directors")))
-			     return
-			     (cl-loop for dir in (dom-by-tag link 'a)
-				      collect (dom-text dir)))
-		    " + "))))
+	  (let ((dom (libxml-parse-html-region (point-min) (point-max))))
+	    (when-let ((src (imdb--get-poster dom)))
+	      (cond
+	       (image-only
+		(imdb-get-image src))
+	       (no-string
+		(list (imdb-get-image src) country
+		      (string-join (imdb--dom-director dom) ", ")))
+	       (t
+		(list (imdb-get-image-string src)
+		      country
+		      (string-join (imdb--dom-director dom) " + "))))))
 	(kill-buffer (current-buffer))))))
+
+
+(defun imdb--dom-director (dom)
+  (cl-loop for link in (dom-by-tag dom 'li)
+	   for span = (dom-by-tag link 'span)
+	   when (and span
+		     (or (equal (dom-text span)
+				"Director")
+			 (equal (dom-text span)
+				"Directors")))
+	   return
+	   (cl-loop for dir in (dom-by-tag link 'a)
+		    collect (dom-text dir))))
 
 (defun imdb-get-image-string (url)
   (propertize
