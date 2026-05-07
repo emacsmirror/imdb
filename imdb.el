@@ -35,8 +35,12 @@
 
 (defun imdb-refresh-cookies ()
   (interactive)
-  (call-process (expand-file-name "get-html.py") nil t nil
-		"https://www.imdb.com/title/tt0080319/" "cookies"))
+  (let ((default-directory (file-name-directory (locate-library "imdb"))))
+    (call-process (expand-file-name "get-html.py") nil nil nil
+		  "https://www.imdb.com/title/tt0080319/" "cookies")
+    (let ((url-cache-expire-time 0)
+	  (url-cache-respect-headers nil))
+      (url-cache-prune-cache))))
 
 (defun imdb-fetch-url (url)
   (let ((default-directory (file-name-directory (locate-library "imdb"))))
