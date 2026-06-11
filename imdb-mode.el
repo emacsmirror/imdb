@@ -1360,25 +1360,25 @@ This will take some hours and use 10GB of disk space."
   (let ((default-directory (file-name-directory (locate-library "imdb"))))
     (with-current-buffer (generate-new-buffer " *imdb url cache*")
       (setq-local url-current-object (url-generic-parse-url url))
-      (let ((cache (url-cache-create-filename url)))
+      (let ((cache (url-cache-create-filename url))
+	    (buffer (current-buffer)))
 	(if (file-exists-p cache)
 	    (progn
 	      (insert-file-contents cache)
 	      (funcall callback nil))
-	  (make-process
-	   :name "get-html"
-	   :buffer (current-buffer)
-	   :command (list (expand-file-name "get-html.py") url)
-	   :sentinel
-	   (lambda (proc _status)
-	     (unless (process-live-p proc)
-	       (with-current-buffer (process-buffer proc)
-		 (let ((coding-system-for-write 'binary))
-		   (unless (file-exists-p (file-name-directory cache))
-		     (make-directory (file-name-directory cache) t))
-		   (write-region (point-min) (point-max) cache nil 'silent)
-		   (goto-char (point-min))
-		   (funcall callback nil)))))))))))
+	  (fetch-dom
+	   url
+	   :type 'string
+	   :callback
+	   (lambda (result)
+	     (with-current-buffer buffer
+	       (insert result)
+	       (let ((coding-system-for-write 'binary))
+		 (unless (file-exists-p (file-name-directory cache))
+		   (make-directory (file-name-directory cache) t))
+		 (write-region (point-min) (point-max) cache nil 'silent)
+		 (goto-char (point-min))
+		 (funcall callback nil))))))))))
 
 (defun imdb-url-retrieve (url callback)
   (let ((cache (url-cache-create-filename url)))
