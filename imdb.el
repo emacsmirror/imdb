@@ -30,17 +30,9 @@
 (require 'dom)
 (require 'json)
 (require 'url-cache)
+(require 'fetch-dom)
 
 (defvar imdb-query-url "https://www.imdb.com/find/?q=%s&ref_=hm_nv_srb_sm")
-
-(defun imdb-refresh-cookies ()
-  (interactive)
-  (let ((default-directory (file-name-directory (locate-library "imdb"))))
-    (call-process (expand-file-name "get-html.py") nil nil nil
-		  "https://www.imdb.com/title/tt0080319/" "cookies")
-    (let ((url-cache-expire-time 0)
-	  (url-cache-respect-headers nil))
-      (url-cache-prune-cache))))
 
 (defun imdb-fetch-url (url)
   (let ((default-directory (file-name-directory (locate-library "imdb"))))
@@ -48,10 +40,7 @@
       (let ((cache (url-cache-create-filename url)))
 	(if (file-exists-p cache)
 	    (insert-file-contents cache)
-	  (call-process (expand-file-name "get-html.py") nil t nil url
-			;; Uncomment if we need to refresh cookies.
-			;; "cookies"
-			)
+	  (insert (fetch-dom url :type 'string))
           (let ((coding-system-for-write 'binary))
 	    (unless (file-exists-p (file-name-directory cache))
 	      (make-directory (file-name-directory cache) t))
