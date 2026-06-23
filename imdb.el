@@ -147,9 +147,9 @@
 	   for id = (let ((href (dom-attr (car links) 'href)))
 		      (when (string-match "/title/\\([^/]+\\)" href)
 			(match-string 1 href)))
-	   for year = (dom-text (dom-by-class elem "cli-title-metadata-item"))
+	   for year = (dom-text (dom-by-class elem "ipc-inline-list__item"))
 	   for img = (dom-attr (dom-by-tag elem 'img) 'src)
-	   for title = (dom-text (dom-by-tag elem 'h3))
+	   for title = (dom-texts (dom-by-class elem "ipc-title-link-wrapper"))
 	   while (< i (or max-results 10))
 	   collect (format
 		    "%s %s, %s, %s"
